@@ -1,9 +1,16 @@
 [project]
 name = "lsp-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Model Context Protocol (MCP) server for Language Server Protocol (LSP) integration"
 readme = "README.md"
+authors = [{ name = "observerw", email = "wozluohd@gmail.com" }]
 requires-python = ">=3.13"
+keywords = ["Model Context Protocol", "MCP", "Language Server Protocol", "LSP"]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "mcp[cli]>=1.13.1",
     "pydantic>=2.11.7",
