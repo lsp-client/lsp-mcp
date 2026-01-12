@@ -67,8 +67,7 @@ if __name__ == "__main__":
 @pytest.fixture()
 async def lsp_client_initialized(test_project_path):
     """Initialize LSP client by changing to the test project directory."""
-    # Import here to avoid issues with module-level imports
-    from lsp_mcp_server import initialize_client, cleanup_client
+    import lsp_mcp_server
     
     # Save current directory
     original_cwd = os.getcwd()
@@ -77,14 +76,14 @@ async def lsp_client_initialized(test_project_path):
         # Change to test project directory
         os.chdir(test_project_path)
         
-        # Initialize client
-        client = await initialize_client()
-        assert client is not None, "Failed to initialize LSP client"
+        # Manually initialize client for testing
+        target = lsp_mcp_server.find_client(test_project_path)
+        assert target is not None, "Failed to find LSP client for test project"
         
-        yield
-        
-        # Cleanup
-        await cleanup_client()
+        async with target.client_cls(workspace=target.project_path) as client:
+            lsp_mcp_server._client = client
+            yield
+            lsp_mcp_server._client = None
     finally:
         # Restore original directory
         os.chdir(original_cwd)

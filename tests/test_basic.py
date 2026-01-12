@@ -21,13 +21,10 @@ def test_mcp_server_creation():
     assert lsp_mcp_server.mcp.name == "lsp-mcp"
 
 
-def test_client_not_initialized_error():
-    """Test that accessing client before initialization raises error."""
-    # Reset client to None
-    lsp_mcp_server._lsp_client = None
-    
-    with pytest.raises(ValueError, match="LSP client not initialized"):
-        lsp_mcp_server.get_client()
+def test_client_not_initialized():
+    """Test that client starts as None."""
+    # Client should be None before initialization
+    assert lsp_mcp_server._client is None
 
 
 if __name__ == "__main__":
