@@ -8,13 +8,11 @@ import lsp_mcp_server
 def test_server_imports():
     """Test that the server module can be imported."""
     assert hasattr(lsp_mcp_server, 'mcp')
-    assert hasattr(lsp_mcp_server, 'init_lsp_client')
     assert hasattr(lsp_mcp_server, 'get_definition')
     assert hasattr(lsp_mcp_server, 'find_references')
     assert hasattr(lsp_mcp_server, 'get_outline')
     assert hasattr(lsp_mcp_server, 'get_hover_info')
     assert hasattr(lsp_mcp_server, 'search_workspace')
-    assert hasattr(lsp_mcp_server, 'shutdown_lsp_client')
 
 
 def test_mcp_server_creation():

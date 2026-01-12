@@ -32,40 +32,22 @@ pip install -e .
 
 ### 作为 MCP 服务器运行
 
+LSP-MCP 服务器会自动检测当前工作目录中的项目类型并初始化相应的 LSP 客户端。只需在项目根目录下启动服务器：
+
 ```bash
+cd /path/to/your/project
 python main.py
 ```
 
+服务器会自动识别以下项目类型：
+- **Python**: 查找 `pyproject.toml`, `setup.py` 等
+- **TypeScript/JavaScript**: 查找 `package.json`, `tsconfig.json` 等
+- **Rust**: 查找 `Cargo.toml`
+- **Go**: 查找 `go.mod`
+
 ### 可用工具
 
-#### 1. 初始化 LSP 客户端
-
-在使用其他工具之前，必须先初始化 LSP 客户端：
-
-```python
-# 使用默认的语言服务器
-init_lsp_client(
-    workspace_root="/path/to/project",
-    language="python"
-)
-
-# 或使用自定义服务器命令
-init_lsp_client(
-    workspace_root="/path/to/project",
-    language="python",
-    server_command="pylsp",
-    server_args=[]
-)
-```
-
-支持的语言：
-- `python` - Python (默认使用 pyright-langserver)
-- `typescript` - TypeScript (默认使用 typescript-language-server)
-- `javascript` - JavaScript
-- `rust` - Rust (默认使用 rust-analyzer)
-- `go` - Go (默认使用 gopls)
-
-#### 2. 获取定义
+#### 1. 获取定义
 
 ```python
 get_definition(
@@ -115,32 +97,23 @@ search_workspace(
 )
 ```
 
-#### 7. 关闭 LSP 客户端
-
-```python
-shutdown_lsp_client()
-```
-
 ## 示例工作流
 
 ```python
-# 1. 初始化客户端 (使用默认语言服务器)
-init_lsp_client(
-    workspace_root="/home/user/my-python-project",
-    language="python"
-)
+# LSP 客户端在服务器启动时自动初始化
+# 确保在项目根目录下启动服务器
 
-# 2. 获取文件大纲
+# 1. 获取文件大纲
 outline = get_outline(file_path="src/models.py")
 
-# 3. 查找符号定义
+# 2. 查找符号定义
 definition = get_definition(
     file_path="src/main.py",
     symbol_name="User",
     mode="definition"
 )
 
-# 4. 查找所有引用
+# 3. 查找所有引用
 references = find_references(
     file_path="src/models.py",
     symbol_name="User.validate",
@@ -148,8 +121,8 @@ references = find_references(
     max_items=50
 )
 
-# 5. 完成后关闭客户端
-shutdown_lsp_client()
+# 4. 搜索工作区
+results = search_workspace(query="User", max_items=20)
 ```
 
 ## 测试

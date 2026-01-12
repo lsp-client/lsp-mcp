@@ -2,63 +2,40 @@
 """
 Manual test script to demonstrate LSP-MCP server functionality.
 
-This script tests the server without requiring a language server to be installed.
-It demonstrates the API and expected behavior.
+This script demonstrates the API and expected behavior.
 """
 
 import asyncio
 
 
-async def demo_without_lsp():
-    """Demonstrate server API without actual LSP connection."""
+async def demo_lsp_mcp():
+    """Demonstrate server API."""
     print("=" * 70)
     print("LSP-MCP Server Demo")
     print("=" * 70)
     print()
     
-    # Import the server functions
-    from lsp_mcp_server import (
-        get_definition,
-        get_outline,
-        init_lsp_client,
-        shutdown_lsp_client,
-    )
-    
-    print("1. Testing init_lsp_client without real server...")
+    print("1. MCP Server Overview")
     print("-" * 70)
-    
-    # This will fail gracefully since we don't have a real LSP server
-    result = await init_lsp_client(
-        workspace_root="/tmp/test_project",
-        language="python",
-        server_command="nonexistent-server",
-        server_args=["--stdio"],
-    )
-    print(f"Result: {result[:200]}...")
+    print("LSP-MCP automatically initializes the LSP client based on the")
+    print("current working directory. Simply start the server from your")
+    print("project root directory.")
     print()
     
-    print("2. Demonstrating API structure...")
+    print("2. Available MCP Tools:")
     print("-" * 70)
-    print("Available tools:")
-    print("  - init_lsp_client: Initialize LSP client for workspace")
     print("  - get_definition: Find symbol definitions")
     print("  - find_references: Find all references to a symbol")
     print("  - get_outline: Get file structure outline")
     print("  - get_hover_info: Get hover information for symbols")
     print("  - search_workspace: Search for symbols in workspace")
-    print("  - shutdown_lsp_client: Clean up and shutdown")
     print()
     
-    print("3. Example usage with a real language server:")
+    print("3. Example usage:")
     print("-" * 70)
     print("""
-# Initialize for Python project
-await init_lsp_client(
-    workspace_root="/path/to/project",
-    language="python",
-    server_command="pyright-langserver",
-    server_args=["--stdio"]
-)
+# The server automatically detects your project type and initializes
+# the appropriate LSP client (Python, TypeScript, Rust, Go, etc.)
 
 # Get file outline
 outline = await get_outline(file_path="src/models.py")
@@ -70,8 +47,12 @@ definition = await get_definition(
     mode="definition"
 )
 
-# Clean up
-await shutdown_lsp_client()
+# Find all references
+references = await find_references(
+    file_path="src/models.py",
+    symbol_name="User.validate",
+    mode="references"
+)
     """)
     
     print("=" * 70)
@@ -92,9 +73,9 @@ async def test_mcp_tools():
     print(f"Instructions: {mcp.instructions[:100]}...")
     print()
     
-    # Try to access tools (they are stored internally)
     print("✓ MCP server successfully created")
     print("✓ All tools registered")
+    print("✓ Automatic LSP client initialization enabled")
     print()
 
 
@@ -103,14 +84,15 @@ def main():
     print("\nStarting LSP-MCP Server Demo...\n")
     
     # Run async demos
-    asyncio.run(demo_without_lsp())
+    asyncio.run(demo_lsp_mcp())
     asyncio.run(test_mcp_tools())
     
     print("\n✓ All demos completed successfully!")
     print("\nTo use the server:")
     print("  1. Install a language server (e.g., pip install pyright)")
-    print("  2. Run: python main.py")
-    print("  3. Connect with an MCP client")
+    print("  2. Navigate to your project directory: cd /path/to/project")
+    print("  3. Start the server: python /path/to/lsp-mcp/main.py")
+    print("  4. Connect with an MCP client")
     print()
 
 

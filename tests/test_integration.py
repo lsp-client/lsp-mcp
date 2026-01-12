@@ -1,15 +1,9 @@
 """Integration test for LSP-MCP server with a real LSP server."""
 
+import os
 import shutil
 
 import pytest
-
-from lsp_mcp_server import (
-    get_definition,
-    get_outline,
-    init_lsp_client,
-    shutdown_lsp_client,
-)
 
 # Skip these tests if pyright-langserver is not installed
 pytestmark = pytest.mark.skipif(
@@ -22,6 +16,14 @@ pytestmark = pytest.mark.skipif(
 def test_project_path(tmp_path_factory):
     """Create a test project with example Python code."""
     project_dir = tmp_path_factory.mktemp("test_project")
+    
+    # Create a pyproject.toml to mark it as a Python project
+    pyproject_file = project_dir / "pyproject.toml"
+    pyproject_file.write_text("""
+[project]
+name = "test-project"
+version = "0.1.0"
+""")
     
     # Create example.py with test code
     example_file = project_dir / "example.py"
@@ -64,22 +66,35 @@ if __name__ == "__main__":
 
 @pytest.fixture()
 async def lsp_client_initialized(test_project_path):
-    """Initialize LSP client for tests."""
-    result = await init_lsp_client(
-        workspace_root=str(test_project_path),
-        language="python",
-    )
-    assert "successfully" in result.lower() or "initialized" in result.lower()
+    """Initialize LSP client by changing to the test project directory."""
+    # Import here to avoid issues with module-level imports
+    from lsp_mcp_server import initialize_client, cleanup_client
     
-    yield
+    # Save current directory
+    original_cwd = os.getcwd()
     
-    # Cleanup
-    await shutdown_lsp_client()
+    try:
+        # Change to test project directory
+        os.chdir(test_project_path)
+        
+        # Initialize client
+        client = await initialize_client()
+        assert client is not None, "Failed to initialize LSP client"
+        
+        yield
+        
+        # Cleanup
+        await cleanup_client()
+    finally:
+        # Restore original directory
+        os.chdir(original_cwd)
 
 
 @pytest.mark.asyncio
 async def test_get_outline(lsp_client_initialized, test_project_path):
     """Test getting file outline."""
+    from lsp_mcp_server import get_outline
+    
     result = await get_outline(
         file_path=str(test_project_path / "example.py")
     )
@@ -91,6 +106,8 @@ async def test_get_outline(lsp_client_initialized, test_project_path):
 @pytest.mark.asyncio
 async def test_get_definition(lsp_client_initialized, test_project_path):
     """Test getting symbol definition."""
+    from lsp_mcp_server import get_definition
+    
     result = await get_definition(
         file_path=str(test_project_path / "example.py"),
         symbol_name="Calculator",

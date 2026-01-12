@@ -5,16 +5,13 @@ This server exposes LSAP (Language Server Agent Protocol) capabilities as MCP to
 allowing AI agents to interact with language servers for code navigation and analysis.
 """
 
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import NamedTuple
 
-from lsp_client import (
-    Client,
-    PyrightClient,
-    TypescriptClient,
-    RustAnalyzerClient,
-    GoplsClient,
-)
-from lsp_client.server import LocalServer
+from lsp_client import Client
+from lsp_client.clients.lang import lang_clients
 from lsp_client.utils.workspace import Workspace, WorkspaceFolder
 from mcp.server.fastmcp import FastMCP
 
@@ -32,125 +29,117 @@ from lsap.schema.outline import OutlineRequest
 from lsap.schema.reference import ReferenceRequest
 from lsap.schema.search import SearchRequest
 
-# Create MCP server
+# Global LSP client instance and context manager
+_lsp_client: Client | None = None
+_lsp_client_cm: Client | None = None  # Store the context manager for proper cleanup
+
+
+class TargetClient(NamedTuple):
+    """Represents a target client for a specific project."""
+    project_path: Path
+    client_cls: type[Client]
+
+
+def find_client(path: Path) -> TargetClient | None:
+    """
+    Find an appropriate LSP client for the given path.
+    
+    This function searches for a suitable language client based on the project
+    structure, similar to lsp-cli's approach.
+    """
+    candidates = lang_clients.values()
+
+    for client_cls in candidates:
+        lang_config = client_cls.get_language_config()
+        if root := lang_config.find_project_root(path):
+            return TargetClient(project_path=root, client_cls=client_cls)
+    return None
+
+
+async def initialize_client() -> Client | None:
+    """
+    Initialize LSP client based on the current working directory.
+    
+    This function automatically detects the project type and initializes
+    the appropriate LSP client.
+    """
+    global _lsp_client, _lsp_client_cm
+    
+    # Get current working directory
+    cwd = Path(os.getcwd()).resolve()
+    
+    # Find appropriate client
+    target = find_client(cwd)
+    if not target:
+        print(f"Warning: No LSP client found for directory: {cwd}")
+        return None
+    
+    print(f"Found {target.client_cls.get_language_config().kind.value} project at {target.project_path}")
+    
+    # Create workspace
+    workspace = Workspace({
+        "main": WorkspaceFolder(
+            uri=target.project_path.as_uri(),
+            name="main",
+        )
+    })
+    
+    # Initialize client
+    client = target.client_cls(workspace=workspace)
+    
+    # Start the client using async context manager
+    _lsp_client_cm = client
+    _lsp_client = await _lsp_client_cm.__aenter__()
+    
+    return _lsp_client
+
+
+async def cleanup_client() -> None:
+    """Clean up the LSP client on shutdown."""
+    global _lsp_client, _lsp_client_cm
+    
+    if _lsp_client is not None and _lsp_client_cm is not None:
+        await _lsp_client_cm.__aexit__(None, None, None)
+        _lsp_client = None
+        _lsp_client_cm = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastMCP):
+    """
+    Lifespan context manager for the MCP server.
+    
+    Initializes the LSP client on startup and cleans up on shutdown.
+    """
+    # Startup: Initialize LSP client
+    await initialize_client()
+    
+    yield
+    
+    # Shutdown: Clean up LSP client
+    await cleanup_client()
+
+
+# Create MCP server with lifespan management
 mcp = FastMCP(
     "lsp-mcp",
     instructions="""
     LSP-MCP Server provides high-level Language Server Protocol capabilities for AI agents.
     It transforms low-level LSP operations into agent-friendly cognitive tools.
     
-    Before using any tools, you must initialize an LSP client using the init_lsp_client tool
-    with the workspace root directory and language server command.
+    The LSP client is automatically initialized based on the current working directory.
     """,
+    lifespan=lifespan,
 )
-
-# Global LSP client instance and context manager
-_lsp_client: Client | None = None
-_lsp_client_cm: Client | None = None  # Store the context manager for proper cleanup
-
-# Language to client class mapping
-LANGUAGE_CLIENT_MAP = {
-    "python": PyrightClient,
-    "typescript": TypescriptClient,
-    "javascript": TypescriptClient,
-    "rust": RustAnalyzerClient,
-    "go": GoplsClient,
-}
 
 
 def get_client() -> Client:
     """Get the LSP client instance."""
     if _lsp_client is None:
         raise ValueError(
-            "LSP client not initialized. Call init_lsp_client first."
+            "LSP client not initialized. Make sure you're running the server from a valid project directory."
         )
     return _lsp_client
-
-
-@mcp.tool()
-async def init_lsp_client(
-    workspace_root: str,
-    language: str,
-    server_command: str | None = None,
-    server_args: list[str] | None = None,
-) -> str:
-    """
-    Initialize the LSP client for a workspace.
-    
-    Args:
-        workspace_root: Path to the workspace root directory
-        language: Language kind (e.g., "python", "typescript", "rust", "go")
-        server_command: Optional language server executable command. If not provided, uses default for language.
-        server_args: Optional arguments for the language server
-    
-    Returns:
-        Status message indicating whether initialization was successful
-    
-    Example:
-        # Using default language server
-        init_lsp_client(
-            workspace_root="/path/to/project",
-            language="python"
-        )
-        
-        # Using custom server command
-        init_lsp_client(
-            workspace_root="/path/to/project",
-            language="python",
-            server_command="pylsp",
-            server_args=[]
-        )
-    """
-    global _lsp_client, _lsp_client_cm
-    
-    try:
-        workspace_path = Path(workspace_root).resolve()
-        if not workspace_path.exists():
-            return f"Error: Workspace path does not exist: {workspace_root}"
-        
-        # Create workspace
-        workspace = Workspace({
-            "main": WorkspaceFolder(
-                uri=workspace_path.as_uri(),
-                name="main",
-            )
-        })
-        
-        # Select client based on language
-        lang_lower = language.lower()
-        
-        if server_command:
-            # Use custom server command
-            server = LocalServer(
-                program=server_command,
-                args=server_args or [],
-            )
-            
-            # Map to appropriate client class based on language
-            client_class = LANGUAGE_CLIENT_MAP.get(lang_lower)
-            if client_class is None:
-                return f"Error: Unsupported language: {language}. Supported: {list(LANGUAGE_CLIENT_MAP.keys())}"
-            
-            client = client_class(
-                server=server,
-                workspace=workspace,
-            )
-        else:
-            # Use default client for language
-            client_class = LANGUAGE_CLIENT_MAP.get(lang_lower)
-            if client_class is None:
-                return f"Error: Unsupported language: {language}. Supported: {list(LANGUAGE_CLIENT_MAP.keys())}"
-            
-            client = client_class(workspace=workspace)
-        
-        # Start the client using async context manager
-        _lsp_client_cm = client
-        _lsp_client = await _lsp_client_cm.__aenter__()
-        
-        return f"LSP client initialized successfully for {language} at {workspace_root}"
-    
-    except Exception as e:
-        return f"Error initializing LSP client: {str(e)}"
 
 
 @mcp.tool()
@@ -468,28 +457,6 @@ async def search_workspace(
     
     except Exception as e:
         return f"Error searching workspace: {str(e)}"
-
-
-@mcp.tool()
-async def shutdown_lsp_client() -> str:
-    """
-    Shutdown the LSP client and clean up resources.
-    
-    Returns:
-        Status message
-    """
-    global _lsp_client, _lsp_client_cm
-    
-    try:
-        if _lsp_client is not None and _lsp_client_cm is not None:
-            # Use async context manager exit for proper cleanup
-            await _lsp_client_cm.__aexit__(None, None, None)
-            _lsp_client = None
-            _lsp_client_cm = None
-            return "LSP client shut down successfully."
-        return "No LSP client was running."
-    except Exception as e:
-        return f"Error shutting down LSP client: {str(e)}"
 
 
 def main():
