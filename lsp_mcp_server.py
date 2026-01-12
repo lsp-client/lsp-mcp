@@ -51,6 +51,15 @@ mcp = FastMCP(
 # Global LSP client instance
 _lsp_client: Client | None = None
 
+# Language to client class mapping
+LANGUAGE_CLIENT_MAP = {
+    "python": PyrightClient,
+    "typescript": TypescriptClient,
+    "javascript": TypescriptClient,
+    "rust": RustAnalyzerClient,
+    "go": GoplsClient,
+}
+
 
 def get_client() -> Client:
     """Get the LSP client instance."""
@@ -121,37 +130,24 @@ async def init_lsp_client(
             )
             
             # Map to appropriate client class based on language
-            client_map = {
-                "python": PyrightClient,
-                "typescript": TypescriptClient,
-                "javascript": TypescriptClient,
-                "rust": RustAnalyzerClient,
-                "go": GoplsClient,
-            }
-            
-            client_class = client_map.get(lang_lower)
+            client_class = LANGUAGE_CLIENT_MAP.get(lang_lower)
             if client_class is None:
-                return f"Error: Unsupported language: {language}. Supported: {list(client_map.keys())}"
+                return f"Error: Unsupported language: {language}. Supported: {list(LANGUAGE_CLIENT_MAP.keys())}"
             
-            _lsp_client = client_class(
+            client = client_class(
                 server=server,
                 workspace=workspace,
             )
         else:
             # Use default client for language
-            if lang_lower == "python":
-                _lsp_client = PyrightClient(workspace=workspace)
-            elif lang_lower in ("typescript", "javascript"):
-                _lsp_client = TypescriptClient(workspace=workspace)
-            elif lang_lower == "rust":
-                _lsp_client = RustAnalyzerClient(workspace=workspace)
-            elif lang_lower == "go":
-                _lsp_client = GoplsClient(workspace=workspace)
-            else:
-                return f"Error: Unsupported language: {language}. Supported: python, typescript, javascript, rust, go"
+            client_class = LANGUAGE_CLIENT_MAP.get(lang_lower)
+            if client_class is None:
+                return f"Error: Unsupported language: {language}. Supported: {list(LANGUAGE_CLIENT_MAP.keys())}"
+            
+            client = client_class(workspace=workspace)
         
-        # Start the client
-        await _lsp_client.start()
+        # Start the client using async context manager
+        _lsp_client = await client.__aenter__()
         
         return f"LSP client initialized successfully for {language} at {workspace_root}"
     
@@ -488,7 +484,8 @@ async def shutdown_lsp_client() -> str:
     
     try:
         if _lsp_client is not None:
-            await _lsp_client.stop()
+            # Use async context manager exit
+            await _lsp_client.__aexit__(None, None, None)
             _lsp_client = None
             return "LSP client shut down successfully."
         return "No LSP client was running."
