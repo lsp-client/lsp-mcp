@@ -48,8 +48,9 @@ mcp = FastMCP(
     """,
 )
 
-# Global LSP client instance
+# Global LSP client instance and context manager
 _lsp_client: Client | None = None
+_lsp_client_cm = None  # Store the context manager for proper cleanup
 
 # Language to client class mapping
 LANGUAGE_CLIENT_MAP = {
@@ -104,7 +105,7 @@ async def init_lsp_client(
             server_args=[]
         )
     """
-    global _lsp_client
+    global _lsp_client, _lsp_client_cm
     
     try:
         workspace_path = Path(workspace_root).resolve()
@@ -147,7 +148,8 @@ async def init_lsp_client(
             client = client_class(workspace=workspace)
         
         # Start the client using async context manager
-        _lsp_client = await client.__aenter__()
+        _lsp_client_cm = client
+        _lsp_client = await _lsp_client_cm.__aenter__()
         
         return f"LSP client initialized successfully for {language} at {workspace_root}"
     
@@ -480,13 +482,14 @@ async def shutdown_lsp_client() -> str:
     Returns:
         Status message
     """
-    global _lsp_client
+    global _lsp_client, _lsp_client_cm
     
     try:
-        if _lsp_client is not None:
-            # Use async context manager exit
-            await _lsp_client.__aexit__(None, None, None)
+        if _lsp_client is not None and _lsp_client_cm is not None:
+            # Use async context manager exit for proper cleanup
+            await _lsp_client_cm.__aexit__(None, None, None)
             _lsp_client = None
+            _lsp_client_cm = None
             return "LSP client shut down successfully."
         return "No LSP client was running."
     except Exception as e:
