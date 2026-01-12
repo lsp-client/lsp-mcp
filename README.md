@@ -43,23 +43,27 @@ python main.py
 在使用其他工具之前，必须先初始化 LSP 客户端：
 
 ```python
+# 使用默认的语言服务器
+init_lsp_client(
+    workspace_root="/path/to/project",
+    language="python"
+)
+
+# 或使用自定义服务器命令
 init_lsp_client(
     workspace_root="/path/to/project",
     language="python",
-    server_command="pyright-langserver",
-    server_args=["--stdio"]
+    server_command="pylsp",
+    server_args=[]
 )
 ```
 
 支持的语言：
-- `python` - Python (使用 pyright-langserver, pylsp 等)
-- `typescript` - TypeScript
+- `python` - Python (默认使用 pyright-langserver)
+- `typescript` - TypeScript (默认使用 typescript-language-server)
 - `javascript` - JavaScript
-- `rust` - Rust
-- `go` - Go
-- `java` - Java
-- `cpp` - C++
-- `c` - C
+- `rust` - Rust (默认使用 rust-analyzer)
+- `go` - Go (默认使用 gopls)
 
 #### 2. 获取定义
 
@@ -120,12 +124,10 @@ shutdown_lsp_client()
 ## 示例工作流
 
 ```python
-# 1. 初始化客户端
+# 1. 初始化客户端 (使用默认语言服务器)
 init_lsp_client(
     workspace_root="/home/user/my-python-project",
-    language="python",
-    server_command="pyright-langserver",
-    server_args=["--stdio"]
+    language="python"
 )
 
 # 2. 获取文件大纲

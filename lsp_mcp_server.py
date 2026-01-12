@@ -10,7 +10,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lsp_client import Client
+from lsp_client import (
+    Client,
+    PyrightClient,
+    TypescriptClient,
+    RustAnalyzerClient,
+    GoplsClient,
+)
+from lsp_client.server import LocalServer
 from lsp_client.utils.workspace import Workspace, WorkspaceFolder
 from lsprotocol.types import LanguageKind
 from mcp.server.fastmcp import FastMCP
@@ -58,7 +65,7 @@ def get_client() -> Client:
 async def init_lsp_client(
     workspace_root: str,
     language: str,
-    server_command: str,
+    server_command: str | None = None,
     server_args: list[str] | None = None,
 ) -> str:
     """
@@ -67,18 +74,25 @@ async def init_lsp_client(
     Args:
         workspace_root: Path to the workspace root directory
         language: Language kind (e.g., "python", "typescript", "rust", "go")
-        server_command: Language server executable command (e.g., "pyright-langserver", "typescript-language-server")
-        server_args: Optional arguments for the language server (e.g., ["--stdio"])
+        server_command: Optional language server executable command. If not provided, uses default for language.
+        server_args: Optional arguments for the language server
     
     Returns:
         Status message indicating whether initialization was successful
     
     Example:
+        # Using default language server
+        init_lsp_client(
+            workspace_root="/path/to/project",
+            language="python"
+        )
+        
+        # Using custom server command
         init_lsp_client(
             workspace_root="/path/to/project",
             language="python",
-            server_command="pyright-langserver",
-            server_args=["--stdio"]
+            server_command="pylsp",
+            server_args=[]
         )
     """
     global _lsp_client
@@ -88,22 +102,6 @@ async def init_lsp_client(
         if not workspace_path.exists():
             return f"Error: Workspace path does not exist: {workspace_root}"
         
-        # Map language string to LanguageKind
-        language_map = {
-            "python": LanguageKind.Python,
-            "typescript": LanguageKind.TypeScript,
-            "javascript": LanguageKind.JavaScript,
-            "rust": LanguageKind.Rust,
-            "go": LanguageKind.Go,
-            "java": LanguageKind.Java,
-            "cpp": LanguageKind.CPP,
-            "c": LanguageKind.C,
-        }
-        
-        lang_kind = language_map.get(language.lower())
-        if lang_kind is None:
-            return f"Error: Unsupported language: {language}. Supported: {list(language_map.keys())}"
-        
         # Create workspace
         workspace = Workspace({
             "main": WorkspaceFolder(
@@ -112,15 +110,45 @@ async def init_lsp_client(
             )
         })
         
-        # Build server command
-        cmd_args = server_args or ["--stdio"]
+        # Select client based on language
+        lang_lower = language.lower()
         
-        # Create LSP client
-        _lsp_client = Client(
-            language=lang_kind,
-            workspace=workspace,
-            server_cmd=[server_command] + cmd_args,
-        )
+        if server_command:
+            # Use custom server command
+            server = LocalServer(
+                program=server_command,
+                args=server_args or [],
+            )
+            
+            # Map to appropriate client class based on language
+            client_map = {
+                "python": PyrightClient,
+                "typescript": TypescriptClient,
+                "javascript": TypescriptClient,
+                "rust": RustAnalyzerClient,
+                "go": GoplsClient,
+            }
+            
+            client_class = client_map.get(lang_lower)
+            if client_class is None:
+                return f"Error: Unsupported language: {language}. Supported: {list(client_map.keys())}"
+            
+            _lsp_client = client_class(
+                server=server,
+                workspace=workspace,
+            )
+        else:
+            # Use default client for language
+            if lang_lower == "python":
+                _lsp_client = PyrightClient(workspace=workspace)
+            elif lang_lower in ("typescript", "javascript"):
+                _lsp_client = TypescriptClient(workspace=workspace)
+            elif lang_lower == "rust":
+                _lsp_client = RustAnalyzerClient(workspace=workspace)
+            elif lang_lower == "go":
+                _lsp_client = GoplsClient(workspace=workspace)
+            else:
+                return f"Error: Unsupported language: {language}. Supported: python, typescript, javascript, rust, go"
         
         # Start the client
         await _lsp_client.start()
