@@ -1,8 +1,6 @@
 """Integration test for LSP-MCP server with a real LSP server."""
 
-import asyncio
 import shutil
-from pathlib import Path
 
 import pytest
 
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     return project_dir
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 async def lsp_client_initialized(test_project_path):
     """Initialize LSP client for tests."""
     result = await init_lsp_client(
@@ -100,8 +98,14 @@ async def test_get_definition(lsp_client_initialized, test_project_path):
         include_code=True,
     )
     
-    # Should contain definition information or error message
-    assert "Calculator" in result or "definition" in result.lower() or "error" in result.lower()
+    # Should contain definition information or a clear error message about the definition request
+    result_lower = result.lower()
+    if "error" in result_lower:
+        # Error path: ensure it's an error related to the definition request
+        assert "definition" in result_lower
+    else:
+        # Success path: should contain definition information for Calculator
+        assert "Calculator" in result or "definition" in result_lower
 
 
 if __name__ == "__main__":

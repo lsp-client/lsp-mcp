@@ -2,11 +2,11 @@
 
 import pytest
 
+import lsp_mcp_server
+
 
 def test_server_imports():
     """Test that the server module can be imported."""
-    import lsp_mcp_server
-    
     assert hasattr(lsp_mcp_server, 'mcp')
     assert hasattr(lsp_mcp_server, 'init_lsp_client')
     assert hasattr(lsp_mcp_server, 'get_definition')
@@ -19,22 +19,17 @@ def test_server_imports():
 
 def test_mcp_server_creation():
     """Test that the MCP server is created correctly."""
-    from lsp_mcp_server import mcp
-    
-    assert mcp is not None
-    assert mcp.name == "lsp-mcp"
+    assert lsp_mcp_server.mcp is not None
+    assert lsp_mcp_server.mcp.name == "lsp-mcp"
 
 
 def test_client_not_initialized_error():
     """Test that accessing client before initialization raises error."""
-    from lsp_mcp_server import get_client
-    
     # Reset client to None
-    import lsp_mcp_server
     lsp_mcp_server._lsp_client = None
     
     with pytest.raises(ValueError, match="LSP client not initialized"):
-        get_client()
+        lsp_mcp_server.get_client()
 
 
 if __name__ == "__main__":

@@ -5,10 +5,7 @@ This server exposes LSAP (Language Server Agent Protocol) capabilities as MCP to
 allowing AI agents to interact with language servers for code navigation and analysis.
 """
 
-import asyncio
-import json
 from pathlib import Path
-from typing import Any
 
 from lsp_client import (
     Client,
@@ -19,7 +16,6 @@ from lsp_client import (
 )
 from lsp_client.server import LocalServer
 from lsp_client.utils.workspace import Workspace, WorkspaceFolder
-from lsprotocol.types import LanguageKind
 from mcp.server.fastmcp import FastMCP
 
 from lsap.capability import (
@@ -31,7 +27,7 @@ from lsap.capability import (
 )
 from lsap.schema.definition import DefinitionRequest
 from lsap.schema.hover import HoverRequest
-from lsap.schema.locate import Locate, LocateRequest
+from lsap.schema.locate import Locate
 from lsap.schema.outline import OutlineRequest
 from lsap.schema.reference import ReferenceRequest
 from lsap.schema.search import SearchRequest
@@ -50,7 +46,7 @@ mcp = FastMCP(
 
 # Global LSP client instance and context manager
 _lsp_client: Client | None = None
-_lsp_client_cm = None  # Store the context manager for proper cleanup
+_lsp_client_cm: Client | None = None  # Store the context manager for proper cleanup
 
 # Language to client class mapping
 LANGUAGE_CLIENT_MAP = {

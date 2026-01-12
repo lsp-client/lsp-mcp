@@ -7,7 +7,6 @@ It demonstrates the API and expected behavior.
 """
 
 import asyncio
-from pathlib import Path
 
 
 async def demo_without_lsp():
