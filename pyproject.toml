@@ -4,14 +4,25 @@ version = "0.1.0"
 description = "Model Context Protocol (MCP) server for Language Server Protocol (LSP) integration"
 readme = "README.md"
 authors = [{ name = "observerw", email = "wozluohd@gmail.com" }]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 keywords = ["Model Context Protocol", "MCP", "Language Server Protocol", "LSP"]
 classifiers = [
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
     "mcp[cli]>=1.13.1",
     "pydantic>=2.11.7",
+    "lsap-sdk>=0.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.setuptools]
+py-modules = ["lsp_mcp_server", "main", "demo"]
